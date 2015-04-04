@@ -1,8 +1,10 @@
-#include <iostream>
-#include <cstdlib>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <iostream>
 #include <fstream>
 #include <string>
 
@@ -73,6 +75,7 @@ Loop:
            unsigned numWay = findWays(location, isWayPassable);
            if(numWay == 0)
            {
+               printMap();
                if( map.src[coordinate2offset(location)] == 'K'){
                     printMsg(getpid(), location, found);
                     newChildReport[walkDirection] = true;
@@ -80,7 +83,6 @@ Loop:
                }
                else{
                     printMsg(getpid(), location, none);
-                    newChildReport[walkDirection] = false;
                     return -1;
                }
            }
@@ -163,7 +165,7 @@ Loop:
     {
         bool isFound = false;
         for(int i = 0; i < numChild; ++i)
-            cout << "return value; " << wait(NULL) << endl;
+            wait(NULL);
         for(int i = 0; i < 4; ++i)
             if(newChildReport[i] == true){
                 isFound = true;
@@ -179,13 +181,13 @@ Loop:
             printMsg(getpid(), location, none);
         
         delete [] newChildReport;
-        cout << "pid=" << getpid() << " "<< "Number of Processes: " << *numProcess << endl;
     }
 
     if(getpid() == firstPid) {
+        cout << "pid=" << getpid() << " "<< "Number of Processes: " << *numProcess << endl;
+        printMap();
         delete [] map.src;
         delete numProcess;
-        printMap();
         cout << "Search mineral done!" << endl;
     }
     return 0;
