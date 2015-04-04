@@ -8,6 +8,7 @@
 #include <sys/shm.h>
 #include <iostream>
 #include <cstdlib>
+#include <vector>
 #include <fstream>
 #include <string>
 
@@ -48,18 +49,15 @@ unsigned int findWays(const coordinate &location, bool isWayPassable[4]);
 direction findOneWay(bool isWayPassable[4]);
 void walk(coordinate &location, direction &d);
 bool isValidPos(const coordinate &location);
-bool *buildCommunictionBridge();
 
 int main(int argv, char *args[])
 {
-    //cross processes data
-    bool *parentReceiveReport = NULL, *newChildReport = NULL;
     //local process data
     pid_t childPid = 0;
     coordinate location;
     direction walkDirection = up;
     bool isWayPassable[4];
-    unsigned numChild = 0;
+    vector<pid_t> childrenPid;
     //first process
     init(args);
     printMap();
@@ -84,12 +82,11 @@ Loop:
                printMap();
                if( map.src[coordinate2offset(location)] == 'K'){
                     printMsg(getpid(), location, found);
-                    newChildReport[walkDirection] = true;
-                    return 0;
+                    return true;
                }
                else{
                     printMsg(getpid(), location, none);
-                    return -1;
+                    return false;
                }
            }
            else if(numWay == 1)
@@ -99,14 +96,9 @@ Loop:
            }
            else
            {
-               parentReceiveReport = newChildReport;
-               newChildReport = buildCommunictionBridge();
-               newChildReport[0] = newChildReport[1] = newChildReport[2] = newChildReport[3] = false;
-
-               numChild = 0;
+               childrenPid.clear();
                if(isWayPassable[up]){
                     *numProcess += 1;
-                    ++numChild;
                     walkDirection = up;
                     childPid = 0;
                     childPid = fork();      
@@ -116,11 +108,11 @@ Loop:
                     }
                     else{
                         printMsg(childPid, location, childStatus);
+                        childrenPid.push_back(childPid);
                     }
                }
                if(isWayPassable[down]){
                     *numProcess += 1;
-                    ++numChild;
                     walkDirection = down;
                     childPid = 0;
                     childPid = fork();      
@@ -130,11 +122,11 @@ Loop:
                     }
                     else{
                         printMsg(childPid, location, childStatus);
+                        childrenPid.push_back(childPid);
                     } 
                }
                if(isWayPassable[leftDir]){
                     *numProcess += 1;
-                    ++numChild;
                     walkDirection = leftDir;
                     childPid = 0;
                     childPid = fork();      
@@ -144,11 +136,11 @@ Loop:
                     }
                     else{
                         printMsg(childPid, location, childStatus);
+                        childrenPid.push_back(childPid);
                     }
                }
                if(isWayPassable[rightDir]){
                    *numProcess += 1;
-                   ++numChild;
                    walkDirection = rightDir;
                    childPid = 0;
                    childPid = fork();      
@@ -158,6 +150,7 @@ Loop:
                    }
                    else{
                        printMsg(childPid, location, childStatus);
+                       childrenPid.push_back(childPid);
                    }
                }
            }
@@ -174,21 +167,24 @@ Loop:
     else
     {
         bool isFound = false;
-        for(int i = 0; i < numChild; ++i)
-            wait(NULL);
-        for(int i = 0; i < 4; ++i)
-            if(newChildReport[i] == true){
+        int rValue = 0;
+        for(int i = 0; i < childrenPid.size(); ++i) {
+            waitpid(childrenPid[i], &rValue, 0);
+            if(WEXITSTATUS(rValue) == true) {
                 isFound = true;
                 break;
             }
-        //report whether found K
-        if(parentReceiveReport != NULL)
-            parentReceiveReport[walkDirection] = isFound;
+        }
+        cout << endl;
         //print isfound message
-        if(isFound)
+        if(isFound){
             printMsg(getpid(), location, found);
-        else
+            return true;
+        }
+        else{
             printMsg(getpid(), location, none);
+            return false;
+        }
     }
 
     if(getpid() == firstPid) {
@@ -376,22 +372,4 @@ bool isValidPos(const coordinate &location)
         return false;
     //valid direction
     return true;
-}
-
-
-bool *buildCommunictionBridge()
-{
-    void *bridgePtr;
-    char *name = new char;
-    int fd;
-    int id;
-    *name = rand() % 255;
-    fd = shm_open(name, O_CREAT | O_RDWR, 0666);
-    ftruncate(fd, 4);
-    ipc_key = ftok(shareMemName, 'B');
-    bridgePtr = mmap(0, 4, PROT_WRITE, MAP_SHARED, fd, 0);
-    id = shmget(ipc_key, 4, IPC_EXCL);
-    shmctl(id, IPC_RMID, 0);
-   
-    return (bool *)bridgePtr;
 }
