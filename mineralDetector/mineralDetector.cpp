@@ -4,7 +4,10 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <iostream>
+#include <cstdlib>
 #include <fstream>
 #include <string>
 
@@ -27,7 +30,12 @@ enum direction {up,down, leftDir, rightDir};
 
 //global variable
 pid_t firstPid;
+const char *shareMemName = "shareMap";
+int shm_fd; //share memory file descriptor
+int ipc_key;
+int shm_id;
 mapFile map;
+void *mapPtr;
 unsigned *numProcess;
 //function declaration
 void init(char *args[]);
@@ -40,11 +48,12 @@ unsigned int findWays(const coordinate &location, bool isWayPassable[4]);
 direction findOneWay(bool isWayPassable[4]);
 void walk(coordinate &location, direction &d);
 bool isValidPos(const coordinate &location);
+bool *buildCommunictionBridge();
 
 int main(int argv, char *args[])
 {
     //cross processes data
-    bool *parentReceiveReport, *newChildReport;
+    bool *parentReceiveReport = NULL, *newChildReport = NULL;
     //local process data
     pid_t childPid = 0;
     coordinate location;
@@ -69,9 +78,6 @@ Loop:
     {
        if(*numProcess < 400)
        {
-           parentReceiveReport = newChildReport;
-           newChildReport = new bool[4]; 
-           newChildReport[0] = newChildReport[1] = newChildReport[2] = newChildReport[3] = false;
            unsigned numWay = findWays(location, isWayPassable);
            if(numWay == 0)
            {
@@ -93,6 +99,10 @@ Loop:
            }
            else
            {
+               parentReceiveReport = newChildReport;
+               newChildReport = buildCommunictionBridge();
+               newChildReport[0] = newChildReport[1] = newChildReport[2] = newChildReport[3] = false;
+
                numChild = 0;
                if(isWayPassable[up]){
                     *numProcess += 1;
@@ -172,24 +182,22 @@ Loop:
                 break;
             }
         //report whether found K
-        if(getpid() != firstPid)
+        if(parentReceiveReport != NULL)
             parentReceiveReport[walkDirection] = isFound;
         //print isfound message
         if(isFound)
             printMsg(getpid(), location, found);
         else
             printMsg(getpid(), location, none);
-        
-        delete [] newChildReport;
     }
 
     if(getpid() == firstPid) {
         cout << "pid=" << getpid() << " "<< "Number of Processes: " << *numProcess << endl;
         printMap();
-        delete [] map.src;
-        delete numProcess;
         cout << "Search mineral done!" << endl;
+        close(shm_fd);
     }
+    delete numProcess;
     return 0;
 }
 
@@ -203,6 +211,7 @@ void init(char *args[])
 
 void loadMap(char *fileName)
 {
+    //read data from a file
     string row;
     string mapData;
     int numLine = 0;
@@ -211,14 +220,22 @@ void loadMap(char *fileName)
         mapData += row;
         ++numLine;
     }
-    cout << "number of characters: " << mapData.size() << endl;
+    cout << "Map Size: " << numLine << " X 20" << endl;
     fin.close();
 
-    char *mapPtr = new char[mapData.size()];
+    //create a share memory object
+    const size_t dataSize = numLine * 20;
+    shm_fd = shm_open(shareMemName, O_CREAT | O_RDWR, 0666);
+    ftruncate(shm_fd, dataSize);
+    ipc_key = ftok(shareMemName, 'R');
+    mapPtr = mmap(0, dataSize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    shm_id = shmget(ipc_key, dataSize, IPC_EXCL);
+    shmctl(shm_id, IPC_RMID, 0);
+    //write data to share memory
     for(int i = 0; i < mapData.size(); ++i)
-        mapPtr[i] = mapData[i];
+        ((char *)mapPtr)[i] = mapData[i];
     
-    map.src = mapPtr;
+    map.src = ((char *)mapPtr);
     map.numLine = numLine;
     map.sPoint = findStartPoint();
 }
@@ -359,4 +376,22 @@ bool isValidPos(const coordinate &location)
         return false;
     //valid direction
     return true;
+}
+
+
+bool *buildCommunictionBridge()
+{
+    void *bridgePtr;
+    char *name = new char;
+    int fd;
+    int id;
+    *name = rand() % 255;
+    fd = shm_open(name, O_CREAT | O_RDWR, 0666);
+    ftruncate(fd, 4);
+    ipc_key = ftok(shareMemName, 'B');
+    bridgePtr = mmap(0, 4, PROT_WRITE, MAP_SHARED, fd, 0);
+    id = shmget(ipc_key, 4, IPC_EXCL);
+    shmctl(id, IPC_RMID, 0);
+   
+    return (bool *)bridgePtr;
 }
