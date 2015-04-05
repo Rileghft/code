@@ -28,6 +28,7 @@ enum direction {upDir,downDir, leftDir, rightDir};
 
 //global variable
 const char *shareMapName = "shareMap";
+const char *shareNumProcessName = "numProcess";
 mapFile map;
 unsigned *numProcess;
 pid_t firstPid;
@@ -110,9 +111,9 @@ Loop:
     //parent task
     else
     {
-        delete numProcess;
         bool isFound = false;
         int rValue = 0;
+        //check children return value
         for(int i = 0; i < childrenPid.size(); ++i) {
             waitpid(childrenPid[i], &rValue, 0);
             if(WEXITSTATUS(rValue) == true) {
@@ -120,8 +121,6 @@ Loop:
                 break;
             }
         }
-        if(getpid() == firstPid)
-            shm_unlink(shareMapName);
         //print isfound message
         if(isFound)
             printMsg(getpid(), found);
@@ -129,6 +128,8 @@ Loop:
             printMsg(getpid(), none);
         if(getpid() == firstPid){
             printMap();
+            shm_unlink(shareMapName);
+            shm_unlink(shareNumProcessName);
         }
         return isFound;
     }
@@ -138,7 +139,7 @@ Loop:
 
 void init(char *args[])
 {
-    numProcess = new unsigned;
+    numProcess = (unsigned *)shmFactory(shareNumProcessName, 4);
     *numProcess = 1;
     loadMap(args[1]);
     firstPid = getpid();
@@ -159,16 +160,13 @@ void loadMap(char *fileName)
     cout << "Map Size: " << numLine << " X 20" << endl;
     fin.close();
 
-    //create a share memory object
-    const size_t mapSize = numLine * 20;
-    
-    map.src = (char *)shmFactory(shareMapName, mapSize);
     //initialize map
+    const size_t mapSize = numLine * 20;
+    map.src = (char *)shmFactory(shareMapName, mapSize);
     for(int i = 0; i < mapData.size(); ++i)
         map.src[i] = mapData[i];
     map.numLine = numLine;
     map.sPoint = findStartPoint();
-    
 }
 
 unsigned coordinate2offset(coordinate &pos)
