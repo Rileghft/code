@@ -4,6 +4,7 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <ctime>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
@@ -16,48 +17,59 @@ struct coordinate{
     unsigned row;
     unsigned col;
 };
-
 struct mapFile{
     char *src;
     coordinate sPoint;
     unsigned numLine;
 };
-
 enum msgType {childStatus, found, none};
 enum direction {upDir,downDir, leftDir, rightDir};
+struct report{
+    coordinate location[4];
+    msgType msg[4];
+};
 
 //global variable
-const char *shareMapName = "shareMap";
-const char *shareNumProcessName = "numProcess";
+const char *MapName = "/shareMap";
+const char *NumProcessName = "/numProcess";
+const char *NumFoundName = "/numFound";
+char *reportName;
 mapFile map;
 unsigned *numProcess;
+unsigned *numFound;
 pid_t firstPid;
 pid_t childPid;
-vector<pid_t> childrenPid;
+int shm_fd;
+vector<pid_t> childrenPid(4);
+report *upReport = NULL, *downReport = NULL;
 coordinate location;
+direction sourceDirection;
 direction walkDirection;
 bool isWayPassable[4];
-bool isChild;
 //function declaration
 void init(char *args[]);
 void loadMap(char *fileName);
 coordinate findStartPoint(void); 
 unsigned coordinate2offset(coordinate &pos);
 void printMap();
-void printMsg(pid_t pid, msgType type);
+void printMsg(pid_t pid, coordinate &location, msgType type);
 unsigned int findWays(); 
 bool isValidPos(const coordinate &location);
 direction findOneWay();
 void walk();
 bool search(const direction &dir);
 int *shmFactory(const char *name, size_t spaceSize);
+const char *randName();
 
 int main(int argv, char *args[])
 {
+    //local variable
+    bool isChild;
+    char *underFootChar;
     //first process
     init(args);
     printMap();
-    printMsg(firstPid, childStatus);
+    printMsg(firstPid, location, childStatus);
     
 Loop:
     //error occur
@@ -72,16 +84,19 @@ Loop:
        if(*numProcess < 400)
        {
            unsigned numWay = findWays();
-           if(numWay == 0)
+           underFootChar = &map.src[coordinate2offset(location)];
+           if(numWay == 0 || *underFootChar == 'K')
            {
-               if( map.src[coordinate2offset(location)] == 'K'){
-                    printMsg(getpid(), found);
-                    return true;
+               downReport->location[sourceDirection] = location;
+               if( *underFootChar == 'K'){
+                    downReport->msg[sourceDirection] = found;
+                    *numFound += 1;
                }
                else{
-                    printMsg(getpid(), none);
-                    return false;
+                    *underFootChar = 'X';
+                    downReport->msg[sourceDirection] = none;
                }
+               return 0;
            }
            else if(numWay == 1)
            {
@@ -90,8 +105,13 @@ Loop:
            }
            else
            {
-               isChild = false;
+               upReport = downReport;
+               downReport = (report *)shmFactory(randName(), 48);
                childrenPid.clear();
+               childrenPid.reserve(4);
+               isChild = false;
+               if(*underFootChar != 'K' && *underFootChar != 'S')
+                   *underFootChar = '#';
                for(unsigned dir = upDir; dir <= rightDir; ++dir)
                    if(isWayPassable[dir]){
                         isChild = search((direction)dir);
@@ -111,36 +131,49 @@ Loop:
     //parent task
     else
     {
-        bool isFound = false;
-        int rValue = 0;
-        //check children return value
-        for(int i = 0; i < childrenPid.size(); ++i) {
-            waitpid(childrenPid[i], &rValue, 0);
-            if(WEXITSTATUS(rValue) == true) {
-                isFound = true;
-                break;
-            }
+        int status;
+        msgType isFound = none;
+        //check children report
+        for(int i = 0; i < 4; ++i) {
+            wait(NULL);
+            if(childrenPid[i] == 0)
+                continue;
+            else
+                waitpid(childrenPid[i], &status, 0);
+            if(downReport->msg[i] == found)
+                isFound = found;
+            printMsg(childrenPid[i], downReport->location[i], downReport->msg[i]);
         }
-        //print isfound message
-        if(isFound)
-            printMsg(getpid(), found);
-        else
-            printMsg(getpid(), none);
+        //report
         if(getpid() == firstPid){
+            printMsg(firstPid, location, isFound);
             printMap();
-            shm_unlink(shareMapName);
-            shm_unlink(shareNumProcessName);
+            cout << "numProcess: " <<  *numProcess << endl;
+            cout << "Number of founds: " << *numFound << endl;
+            shm_unlink(MapName);
+            shm_unlink(reportName);
+            shm_unlink(NumProcessName);
+            shm_unlink(NumFoundName);
+            return 0;
         }
-        return isFound;
+        upReport->location[sourceDirection] = location;
+        if(isFound)
+            upReport->msg[sourceDirection] = found;
+        else
+            upReport->msg[sourceDirection] = none;
+        close(shm_fd);
+        shm_unlink(reportName);
+        return 0;
     }
-
-    return 0;
 }
 
 void init(char *args[])
 {
-    numProcess = (unsigned *)shmFactory(shareNumProcessName, 4);
+    numProcess = (unsigned *)shmFactory(NumProcessName, 4);
+    numFound = (unsigned *)shmFactory(NumFoundName, 4);
     *numProcess = 1;
+    *numFound = 0;
+    srand(time(0));
     loadMap(args[1]);
     firstPid = getpid();
     location = map.sPoint;
@@ -162,7 +195,7 @@ void loadMap(char *fileName)
 
     //initialize map
     const size_t mapSize = numLine * 20;
-    map.src = (char *)shmFactory(shareMapName, mapSize);
+    map.src = (char *)shmFactory(MapName, mapSize);
     for(int i = 0; i < mapData.size(); ++i)
         map.src[i] = mapData[i];
     map.numLine = numLine;
@@ -197,7 +230,7 @@ void printMap()
     cout << endl;
 }
 
-void printMsg(pid_t pid, msgType type)
+void printMsg(pid_t pid, coordinate &location, msgType type)
 {
     switch(type)
     {
@@ -255,7 +288,6 @@ direction findOneWay()
 
 void walk()
 {
-    unsigned offset = coordinate2offset(location);
     switch(walkDirection)
     {
         case upDir:
@@ -271,8 +303,9 @@ void walk()
             location.col += 1;
             break;
     }
-    if(map.src[offset] != 'K')
-        map.src[offset] = '-';
+    char *underFootChar = &map.src[coordinate2offset(location)];
+    if(*underFootChar != 'K')
+        *underFootChar = '-';
 }
 
 bool isValidPos(const coordinate &location)
@@ -292,24 +325,51 @@ bool search(const direction &dir)
     childPid = 0;
     childPid = fork();      
     if(childPid == 0){
+        sourceDirection = dir;
         walk();
         return true;
     }
     else{
-        printMsg(childPid, childStatus);
-        childrenPid.push_back(childPid);
+        printMsg(childPid, location, childStatus);
+        childrenPid[walkDirection] = childPid;
         return false;
     }
 }
 
 int *shmFactory(const char *name, size_t spaceSize)
 {
-    int shm_fd;
     void *shmPtr;
-
-    shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
-    ftruncate(shm_fd, spaceSize);
+    unsigned numFailed = 0;
+    shm_fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0666);
+    while(shm_fd == -1){
+        ++numFailed;
+        shm_fd = shm_open(randName(), O_CREAT | O_EXCL | O_RDWR, 0666);
+        if(numFailed > 5){
+            cout << "Error, new name cannot handle shm_open() failure!" << endl;
+            exit(-1);
+        }
+    }
+    if(ftruncate(shm_fd, spaceSize) == -1){
+        cout << "Error, ftruncate failed" << endl;
+        exit(-1);
+    }
     shmPtr = mmap(0, spaceSize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if(shmPtr == MAP_FAILED){
+        cout << "Error, mmap failed" << endl;
+        exit(-1);
+    }
 
     return (int *)shmPtr;
+}
+
+const char *randName()
+{
+    char *name = new char[10];
+    for(int i = 1; i < 9; ++i)
+        name[i] = rand() % *numProcess + 48;
+    name[0] = '/';
+    name[9] = '\0';
+    reportName = name;
+    
+    return (const char *)name;
 }
