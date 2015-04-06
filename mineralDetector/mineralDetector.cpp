@@ -1,7 +1,6 @@
 #include <iostream>
 #include <cstdlib>
 #include <fstream>
-#include <vector>
 #include <string>
 #include <ctime>
 #include <unistd.h>
@@ -25,22 +24,21 @@ struct mapFile{
 enum msgType {childStatus, found, none};
 enum direction {upDir,downDir, leftDir, rightDir};
 struct report{
+    pid_t pid[4];
     coordinate location[4];
+    unsigned numFound[4];
     msgType msg[4];
 };
 
 //global variable
 const char *MapName = "/shareMap";
 const char *NumProcessName = "/numProcess";
-const char *NumFoundName = "/numFound";
 char *reportName;
 mapFile map;
 unsigned *numProcess;
-unsigned *numFound;
 pid_t firstPid;
 pid_t childPid;
 int shm_fd;
-vector<pid_t> childrenPid(4);
 report *upReport = NULL, *downReport = NULL;
 coordinate location;
 direction sourceDirection;
@@ -90,11 +88,12 @@ Loop:
                downReport->location[sourceDirection] = location;
                if( *underFootChar == 'K'){
                     downReport->msg[sourceDirection] = found;
-                    *numFound += 1;
+                    downReport->numFound[sourceDirection] = 1;
                }
                else{
                     *underFootChar = 'X';
                     downReport->msg[sourceDirection] = none;
+                    downReport->numFound[sourceDirection] = 0;
                }
                return 0;
            }
@@ -106,9 +105,7 @@ Loop:
            else
            {
                upReport = downReport;
-               downReport = (report *)shmFactory(randName(), 48);
-               childrenPid.clear();
-               childrenPid.reserve(4);
+               downReport = (report *)shmFactory(randName(), 80);
                isChild = false;
                if(*underFootChar != 'K' && *underFootChar != 'S')
                    *underFootChar = '#';
@@ -132,32 +129,41 @@ Loop:
     else
     {
         int status;
+        unsigned numFound = 0;
         msgType isFound = none;
         //check children report
         for(int i = 0; i < 4; ++i) {
-            waitpid(childrenPid[i], &status, 0);
-            if(downReport->msg[i] == found)
-                isFound = found;
-            printMsg(childrenPid[i], downReport->location[i], downReport->msg[i]);
+            if(downReport->pid[i] != 0){
+                waitpid(downReport->pid[i], &status, 0);
+                if(downReport->msg[i] == found){
+                    numFound += downReport->numFound[i];
+                    isFound = found;
+                    printMsg(downReport->pid[i], downReport->location[i], downReport->msg[i]);
+                    cout << downReport->numFound[i] << '!' << endl;
+                }
+                else
+                    printMsg(downReport->pid[i], downReport->location[i], downReport->msg[i]);
+            }
         }
         //report
         if(getpid() == firstPid){
             printMsg(firstPid, location, isFound);
+            if(isFound == found)
+                cout << numFound << '!' << endl;
             printMap();
             cout << "numProcess: " <<  *numProcess << endl;
-            cout << "Number of founds: " << *numFound << endl;
+            close(shm_fd);
             shm_unlink(MapName);
             shm_unlink(reportName);
             shm_unlink(NumProcessName);
-            shm_unlink(NumFoundName);
             return 0;
         }
         upReport->location[sourceDirection] = location;
-        if(isFound)
+        upReport->numFound[sourceDirection] = numFound;
+        if(isFound == found)
             upReport->msg[sourceDirection] = found;
         else
             upReport->msg[sourceDirection] = none;
-        close(shm_fd);
         shm_unlink(reportName);
         return 0;
     }
@@ -166,9 +172,7 @@ Loop:
 void init(char *args[])
 {
     numProcess = (unsigned *)shmFactory(NumProcessName, 4);
-    numFound = (unsigned *)shmFactory(NumFoundName, 4);
     *numProcess = 1;
-    *numFound = 0;
     srand(time(0));
     loadMap(args[1]);
     firstPid = getpid();
@@ -234,7 +238,7 @@ void printMsg(pid_t pid, coordinate &location, msgType type)
             cout << "[pid=" << pid << "]: (" << location.row << "," << location.col << ")" << endl;
             break;
         case found:
-            cout << pid << " (" << location.row << "," << location.col << ")" << "Found!" << endl;
+            cout << pid << " (" << location.row << "," << location.col << ")" << "Found ";
             break;
         case none:
             cout << pid << " (" << location.row << "," << location.col << ")" << "None!" << endl;
@@ -327,7 +331,7 @@ bool search(const direction &dir)
     }
     else{
         printMsg(childPid, location, childStatus);
-        childrenPid[walkDirection] = childPid;
+        downReport->pid[walkDirection] = childPid;
         return false;
     }
 }
@@ -335,13 +339,13 @@ bool search(const direction &dir)
 int *shmFactory(const char *name, size_t spaceSize)
 {
     void *shmPtr;
-    unsigned numFailed = 0;
+    unsigned numFailed = 100;
     shm_fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0666);
     while(shm_fd == -1){
-        ++numFailed;
+        --numFailed;
         shm_fd = shm_open(randName(), O_CREAT | O_EXCL | O_RDWR, 0666);
-        if(numFailed > 5){
-            cout << "Error, new name cannot handle shm_open() failure!" << endl;
+        if(!numFailed){
+            cout << "Error, 100 new name cannot handle shm_open() failure!" << endl;
             exit(-1);
         }
     }
