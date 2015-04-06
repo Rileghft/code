@@ -1,4 +1,3 @@
-#include <sys/types.h>
 #include <iostream>
 #include <cstdlib>
 #include <fstream>
@@ -8,6 +7,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <sys/types.h>
 #include <sys/mman.h>
 
 using namespace::std;
@@ -135,11 +135,7 @@ Loop:
         msgType isFound = none;
         //check children report
         for(int i = 0; i < 4; ++i) {
-            wait(NULL);
-            if(childrenPid[i] == 0)
-                continue;
-            else
-                waitpid(childrenPid[i], &status, 0);
+            waitpid(childrenPid[i], &status, 0);
             if(downReport->msg[i] == found)
                 isFound = found;
             printMsg(childrenPid[i], downReport->location[i], downReport->msg[i]);
@@ -366,7 +362,7 @@ const char *randName()
 {
     char *name = new char[10];
     for(int i = 1; i < 9; ++i)
-        name[i] = rand() % *numProcess + 48;
+        name[i] = rand() % 208 + 48;
     name[0] = '/';
     name[9] = '\0';
     reportName = name;
