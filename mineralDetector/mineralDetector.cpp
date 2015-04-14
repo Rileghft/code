@@ -25,7 +25,7 @@ enum msgType {childStatus, found, none};
 enum direction {upDir,downDir, leftDir, rightDir};
 struct report{
     pid_t pid[4];
-    clock_t cputime;
+    clock_t cputime[4];
     coordinate location[4];
     unsigned numFound[4];
     msgType msg[4];
@@ -39,6 +39,7 @@ mapFile map;
 unsigned *numProcess;
 pid_t firstPid;
 pid_t childPid;
+clock_t CPUtime;
 int shm_fd;
 report *upReport = NULL, *downReport = NULL;
 coordinate location;
@@ -59,6 +60,7 @@ void walk();
 bool search(const direction &dir);
 int *shmFactory(const char *name, size_t spaceSize);
 const char *randName();
+void printCPUtime(clock_t t);
 
 int main(int argv, char *args[])
 {
@@ -87,7 +89,7 @@ Loop:
            underFootChar = &map.src[coordinate2offset(location)];
            if(numWay == 0 || *underFootChar == 'K')
            {
-               if(getpid() == firstPid){
+               if(*numProcess == 1){
                    if(*underFootChar == 'K'){
                        printMsg(firstPid, location, found);
                        cout << 1 << '!' << endl;
@@ -95,6 +97,7 @@ Loop:
                    else
                        printMsg(firstPid, location, none);
                    printMap();
+                   printCPUtime(clock() - cputime_start);
                    return 0;
                }
                downReport->location[sourceDirection] = location;
@@ -107,6 +110,7 @@ Loop:
                     downReport->msg[sourceDirection] = none;
                     downReport->numFound[sourceDirection] = 0;
                }
+               downReport->cputime[sourceDirection] = clock() - CPUtime;
                return 0;
            }
            else if(numWay == 1)
@@ -119,6 +123,8 @@ Loop:
                upReport = downReport;
                downReport = (report *)shmFactory(randName(), 88);
                isChild = false;
+               if(*numProcess != 1)
+                   cputime_start = CPUtime;
                if(*underFootChar != 'K' && *underFootChar != 'S')
                    *underFootChar = '#';
                for(unsigned dir = upDir; dir <= rightDir; ++dir)
@@ -140,13 +146,13 @@ Loop:
     //parent task
     else
     {
-        int status;
+        clock_t child_cputime = 0;
         unsigned numFound = 0;
         msgType isFound = none;
         //check children report
         for(int i = 0; i < 4; ++i) {
             if(downReport->pid[i] != 0){
-                waitpid(downReport->pid[i], &status, 0);
+                waitpid(downReport->pid[i], NULL, 0);
                 if(downReport->msg[i] == found){
                     numFound += downReport->numFound[i];
                     isFound = found;
@@ -155,8 +161,10 @@ Loop:
                 }
                 else
                     printMsg(downReport->pid[i], downReport->location[i], downReport->msg[i]);
+                child_cputime += downReport->cputime[i];
             }
         }
+        cout << "child cpu time: " << child_cputime << endl;
         //report
         if(getpid() == firstPid){
             printMsg(firstPid, location, isFound);
@@ -168,6 +176,7 @@ Loop:
             shm_unlink(MapName);
             shm_unlink(reportName);
             shm_unlink(NumProcessName);
+            printCPUtime(child_cputime + clock() - CPUtime);
             return 0;
         }
         upReport->location[sourceDirection] = location;
@@ -177,6 +186,7 @@ Loop:
         else
             upReport->msg[sourceDirection] = none;
         shm_unlink(reportName);
+        upReport->cputime[sourceDirection] = child_cputime + clock() - CPUtime;
         return 0;
     }
 }
@@ -336,6 +346,7 @@ bool search(const direction &dir)
     walkDirection = dir;
     childPid = 0;
     childPid = fork();      
+    CPUtime = clock();
     if(childPid == 0){
         sourceDirection = dir;
         walk();
@@ -384,4 +395,9 @@ const char *randName()
     reportName = name;
     
     return (const char *)name;
+}
+
+void printCPUtime(clock_t t)
+{
+    printf("Total: %2f ms\n", (double)t);
 }
