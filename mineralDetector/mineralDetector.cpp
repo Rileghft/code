@@ -25,6 +25,7 @@ enum msgType {childStatus, found, none};
 enum direction {upDir,downDir, leftDir, rightDir};
 struct report{
     pid_t pid[4];
+    clock_t cputime;
     coordinate location[4];
     unsigned numFound[4];
     msgType msg[4];
@@ -65,6 +66,7 @@ int main(int argv, char *args[])
     bool isChild;
     char *underFootChar;
     //first process
+    clock_t cputime_start = clock();
     init(args);
     printMap();
     printMsg(firstPid, location, childStatus);
@@ -85,6 +87,16 @@ Loop:
            underFootChar = &map.src[coordinate2offset(location)];
            if(numWay == 0 || *underFootChar == 'K')
            {
+               if(getpid() == firstPid){
+                   if(*underFootChar == 'K'){
+                       printMsg(firstPid, location, found);
+                       cout << 1 << '!' << endl;
+                   }
+                   else
+                       printMsg(firstPid, location, none);
+                   printMap();
+                   return 0;
+               }
                downReport->location[sourceDirection] = location;
                if( *underFootChar == 'K'){
                     downReport->msg[sourceDirection] = found;
@@ -105,7 +117,7 @@ Loop:
            else
            {
                upReport = downReport;
-               downReport = (report *)shmFactory(randName(), 80);
+               downReport = (report *)shmFactory(randName(), 88);
                isChild = false;
                if(*underFootChar != 'K' && *underFootChar != 'S')
                    *underFootChar = '#';
