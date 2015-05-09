@@ -164,7 +164,6 @@ Loop:
                 child_cputime += downReport->cputime[i];
             }
         }
-        cout << "child cpu time: " << child_cputime << endl;
         //report
         if(getpid() == firstPid){
             printMsg(firstPid, location, isFound);
