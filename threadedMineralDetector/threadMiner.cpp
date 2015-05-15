@@ -15,21 +15,21 @@ using namespace std;
 
 //Data Structure
 struct coordinate{
+    int level;
     unsigned row;
     unsigned col;
 };
 struct Map{
     int level = 0;
-    coordinate sPoint = {0, 0};
-    coordinate upPoint = {0, 0};
-    coordinate downPoint = {0, 0};
+    coordinate sPoint = {0, 0, 0};
+    coordinate upPoint = {0, 0, 0};
+    coordinate downPoint = {0, 0, 0};
     unsigned numLine = 0;
     string data;
 };
 enum msgType {newThread, found, none};
 enum direction {noDir = -1, upDir,downDir, leftDir, rightDir};
 struct paramType{
-    int level = 0;
     Map *mapPtr;
     coordinate predessesor;
     direction walkDir;
@@ -53,13 +53,13 @@ void loadMap(char *fileName);
 void findNodes(Map *map); 
 void printMap(int &level);
 unsigned get_offset(coordinate &pos);
-void printMsg(pthread_t pid, coordinate &location, msgType type);
-unsigned int findWays(bool *isWayPassable[], coordinate &curPos, Map *mapPtr); 
+void printMsg(pthread_t tid, coordinate &location, msgType type);
+unsigned int findWays(bool isWayPassable[], coordinate &curPos, Map *mapPtr); 
 bool isValidPos(const coordinate &location, Map *mapPtr);
 direction findOneWay(bool isWayPassable[]);
 unsigned walk(const direction &walkDir, bool isWayPassable[], coordinate &curPos, Map *mapPtr, unsigned &numSteps);
 Map *getMapPtr(int level);
-pthread_t search(const int &level, Map *mapPtr, const coordinate &curPos, const direction &dir, vector<paramType *> &paramPtr);
+pthread_t search(Map *mapPtr, const coordinate &curPos, const direction &dir, vector<paramType *> &paramPtr);
 void printCPUtime(clock_t &t);
 
 int main(int argv, char *args[])
@@ -68,10 +68,9 @@ int main(int argv, char *args[])
     init(args);
     //first thread
     Map *mapPtr = getMapPtr(0);
-    printMsg(gettid(),mapPtr->sPoint, newThread);
+    printMsg(gettid(), mapPtr->sPoint, newThread);
     
     paramType *param = new paramType;
-    param->level = 0;
     param->mapPtr = mapPtr;
     param->predessesor = mapPtr->sPoint;
     param->walkDir = noDir;
@@ -101,7 +100,7 @@ void *explore(void *newParam)
 {
     clock_t cpuTime_start = clock();
     paramType *param = (paramType *)newParam;
-    int level = param->level;
+    int level = param->predessesor.level;
     Map *mapPtr = param->mapPtr;
     coordinate curPos = param->predessesor;
     direction walkDir = param->walkDir;
@@ -109,7 +108,7 @@ void *explore(void *newParam)
     unsigned numWay = 0;
     bool isWayPassable[4];
 
-nextLevel:
+nextMap:
     walk(walkDir, isWayPassable, curPos, mapPtr, numSteps);
     walkDir = noDir;
     do {
@@ -130,17 +129,19 @@ nextLevel:
                 break;
             case 'U':
                 delete report;
-                mapPtr = getMapPtr(level + 1);
+                level += 1;
+                mapPtr = getMapPtr(level);
                 curPos = mapPtr->downPoint;
-                cout << "go up!" << endl;
-                goto nextLevel;
+                mapPtr->data[get_offset(curPos)] = '@';
+                goto nextMap;
                 break;
             case 'D':
                 delete report;
-                mapPtr = getMapPtr(level - 1);
+                level -= 1;
+                mapPtr = getMapPtr(level);
                 curPos = mapPtr->upPoint;
-                cout << "go down!" << endl;
-                goto nextLevel;
+                mapPtr->data[get_offset(curPos)] = '@';
+                goto nextMap;
                 break;
             default:
                 report->msg = none;
@@ -162,7 +163,7 @@ nextLevel:
     vector<paramType *>paramPtr;
     for(unsigned dir = upDir; dir <= rightDir; ++dir)
         if(isWayPassable[dir])
-            tids.push_back(search(level, mapPtr, curPos, (direction)dir, paramPtr));
+            tids.push_back(search(mapPtr, curPos, (direction)dir, paramPtr));
     //check children report
     unsigned numFound = 0;
     msgType isFound = none;
@@ -202,12 +203,11 @@ nextLevel:
     pthread_exit(report);
 }
 
-pthread_t search(const int &level, Map *mapPtr, const coordinate &curPos, const direction &dir, vector<paramType *> &paramPtr)
+pthread_t search(Map *mapPtr, const coordinate &curPos, const direction &dir, vector<paramType *> &paramPtr)
 {
     numThread += 1;
     paramType *newParam = new paramType;
     paramPtr.push_back(newParam);
-    newParam->level = level;
     newParam->mapPtr = mapPtr;
     newParam->predessesor = curPos;
     newParam->walkDir = dir;
@@ -276,13 +276,13 @@ void findNodes(Map *map)
             switch(map->data[row * 20 + col])
             {
                 case 'S':
-                    map->sPoint = {row, col};
+                    map->sPoint = {map->level, row, col};
                     break;
                 case 'U':
-                    map->upPoint = {row, col};
+                    map->upPoint = {map->level, row, col};
                     break;
                 case 'D':
-                    map->downPoint = {row, col};
+                    map->downPoint = {map->level, row, col};
                     break;
             }
 }
@@ -308,13 +308,13 @@ void printMsg(pthread_t tid, coordinate &location, msgType type)
     switch(type)
     {
         case newThread:
-            printf("[tid=%llu]: (%u,%u)\n", tid, location.row, location.col);
+            printf("[tid=%llu]: (%u,%u,%u)\n", tid, location.level, location.row, location.col);
             break;
         case found:
-            printf("[tid=%llu]: (%u,%u) Found ", tid, location.row, location.col);
+            printf("[tid=%llu]: (%u,%u,%u) Found ", tid, location.level, location.row, location.col);
             break;
         case none:
-            printf("[tid=%llu]: (%u,%u) None!\n", tid, location.row, location.col);
+            printf("[tid=%llu]: (%u,%u,%u) None!\n", tid, location.level, location.row, location.col);
             break;
         default:
             cout << "Error invalid msgType" << endl;
