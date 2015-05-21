@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 
-#define gettid() syscall(__NR_gettid)
+#define gettid() pthread_self()
 
 using namespace std;
 
@@ -39,7 +39,7 @@ struct reportType{
     coordinate pos;
     unsigned numStep = 0;
     unsigned numFound = 0;
-    msgType msg;
+    msgType msg = none;
     clock_t cpuTime;
 };
 //share variable
@@ -106,6 +106,7 @@ void *explore(void *newParam)
     direction walkDir = param->walkDir;
     unsigned numSteps = 0;
     unsigned numWay = 0;
+    unsigned numFound = 0;
     bool isWayPassable[4];
 
 nextMap:
@@ -125,14 +126,15 @@ nextMap:
         {
             case 'K':
                 report->msg = found;
-                report->numFound = 1;
+                ++numFound;
+                *underFootChar = '-';
                 break;
             case 'U':
                 delete report;
                 level += 1;
                 mapPtr = getMapPtr(level);
                 curPos = mapPtr->downPoint;
-                mapPtr->data[get_offset(curPos)] = '@';
+                *underFootChar = '@';
                 goto nextMap;
                 break;
             case 'D':
@@ -140,15 +142,14 @@ nextMap:
                 level -= 1;
                 mapPtr = getMapPtr(level);
                 curPos = mapPtr->upPoint;
-                mapPtr->data[get_offset(curPos)] = '@';
+                *underFootChar = '@';
                 goto nextMap;
                 break;
             default:
-                report->msg = none;
-                report->numFound = 0;
                 *underFootChar = 'X';
                 break;
         };
+        report->numFound = numFound;
         report->cpuTime = clock() - cpuTime_start;
 
         if(gettid() == firstTid)
@@ -165,7 +166,7 @@ nextMap:
         if(isWayPassable[dir])
             tids.push_back(search(mapPtr, curPos, (direction)dir, paramPtr));
     //check children report
-    unsigned numFound = 0;
+    unsigned childFound = 0;
     msgType isFound = none;
     reportType *rValue;
     clock_t child_cpuTime = 0; 
@@ -173,10 +174,10 @@ nextMap:
     for(pthread_t tid: tids) {
         pthread_join(tid, (void **)&rValue);
         if(rValue->msg == found){
-            numFound += rValue->numFound;
+            childFound += rValue->numFound;
             isFound = found;
             printMsg(rValue->tid, rValue->pos, rValue->msg);
-            cout << rValue->numFound << '!' << endl;
+            printf("%u!\n", rValue->numFound);
         }
         else
             printMsg(rValue->tid, rValue->pos, rValue->msg);
@@ -192,7 +193,7 @@ nextMap:
     report->tid = gettid();
     report->pos = curPos;
     report->numStep = numSteps;
-    report->numFound = numFound;
+    report->numFound = childFound;
     if(isFound == found)
         report->msg = found;
     else
@@ -308,13 +309,13 @@ void printMsg(pthread_t tid, coordinate &location, msgType type)
     switch(type)
     {
         case newThread:
-            printf("[tid=%llu]: (%u,%u,%u)\n", tid, location.level, location.row, location.col);
+            printf("[tid=%lu]: (%d,%u,%u)\n", tid, location.level, location.row, location.col);
             break;
         case found:
-            printf("[tid=%llu]: (%u,%u,%u) Found ", tid, location.level, location.row, location.col);
+            printf("[tid=%lu]: (%d,%u,%u) Found ", tid, location.level, location.row, location.col);
             break;
         case none:
-            printf("[tid=%llu]: (%u,%u,%u) None!\n", tid, location.level, location.row, location.col);
+            printf("[tid=%lu]: (%d,%u,%u) None!\n", tid, location.level, location.row, location.col);
             break;
         default:
             cout << "Error invalid msgType" << endl;
