@@ -1,0 +1,6 @@
+TQ=10
+# ID , Arrival Time , Burst Time
+1,0,8
+2,1,4
+3,2,9
+4,3,5
