@@ -1,0 +1,160 @@
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 1 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 1 robot(s)
+Dispatcher: battery
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (sensor): OK, 1 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 2 robot(s)
+Dispatcher: battery
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (sensor): OK, 2 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 3 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 2 robot(s)
+Dispatcher: sensor
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (battery): OK, 1 robot(s)
+Dispatcher: battery
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (sensor): OK, 3 robot(s)
+Dispatcher: battery
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (sensor): OK, 4 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 3 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 4 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 4 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 5 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 6 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 5 robot(s)
+Dispatcher: sensor
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (battery): OK, 2 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 6 robot(s)
+Dispatcher: sensor
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (battery): OK, 3 robot(s)
+Dispatcher: sensor
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (battery): OK, 4 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 7 robot(s)
+Dispatcher: sensor
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (battery): OK, 5 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 8 robot(s)
+Dispatcher: battery
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (sensor): OK, 5 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 7 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 8 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 9 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 9 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 10 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 11 robot(s)
+Dispatcher: battery
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (sensor): OK, 6 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 10 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 11 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 12 robot(s)
+Dispatcher: battery
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (sensor): OK, 7 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 12 robot(s)
+Dispatcher: battery
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (sensor): OK, 8 robot(s)
+Dispatcher: sensor
+Dispatcher: wifi
+Dispatcher: crawler
+Producer (battery): OK, 6 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: wifi
+Producer (crawler): OK, 13 robot(s)
+Dispatcher: battery
+Dispatcher: sensor
+Dispatcher: crawler
+Producer (wifi): OK, 13 robot(s)
